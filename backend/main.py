@@ -115,18 +115,24 @@ def health_check():
 # ─── Helpers ────────────────────────────────────────────────────────────────
 
 async def _retrieve_context_async(query: str, persona: str = "krishna") -> list[str]:
-    """Retrieve relevant verses from ChromaDB asynchronously without blocking the event loop."""
+    """Retrieve relevant verses from ChromaDB asynchronously with a strict 1.2s timeout to prevent generation delays."""
     def _search():
         try:
             collection = get_persona_collection(persona)
-            results = collection.query(query_texts=[query], n_results=3)
+            results = collection.query(query_texts=[query], n_results=2)
             if results.get("documents") and results["documents"][0]:
                 return results["documents"][0]
         except Exception as e:
             logger.warning(f"ChromaDB retrieval failed: {e}")
         return []
 
-    return await asyncio.to_thread(_search)
+    try:
+        return await asyncio.wait_for(asyncio.to_thread(_search), timeout=1.2)
+    except asyncio.TimeoutError:
+        logger.info("ChromaDB retrieval timed out (1.2s), proceeding instantly with native LLM knowledge.")
+        return []
+    except Exception:
+        return []
 
 # ─── Voice Session (Local Stack) ───────────────────────────────────────────
 
@@ -332,3 +338,23 @@ async def stream_chat(
             "X-Accel-Buffering": "no",
         },
     )
+
+
+# ─── Neural TTS Endpoint ───────────────────────────────────────────────────
+
+@app.get("/tts")
+async def tts_endpoint(
+    text: str = Query(..., description="Text to speak"),
+    persona: str = Query("krishna", description="Persona (krishna, chanakya, laxmibai)")
+):
+    """
+    Returns authentic, human-quality neural speech MP3 generated via Edge-TTS.
+    Uses 'hi-IN-MadhurNeural' for male sages and 'hi-IN-SwaraNeural' for female sages.
+    """
+    try:
+        audio = await generate_speech_bytes(text[:1200], persona)
+        if audio:
+            return Response(content=audio, media_type="audio/mpeg")
+    except Exception as e:
+        logger.error(f"TTS endpoint error: {e}")
+    raise HTTPException(status_code=500, detail="Speech synthesis failed")

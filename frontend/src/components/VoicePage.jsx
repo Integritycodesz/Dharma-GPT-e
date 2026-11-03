@@ -4,150 +4,101 @@ import {
   ArrowLeft, 
   Volume2, 
   VolumeX, 
-  Shield, 
-  Zap, 
-  Flame, 
-  History, 
-  Settings, 
-  HelpCircle, 
-  Sparkles, 
-  MicOff, 
   Mic, 
-  Keyboard, 
-  Activity // for transcript icon
+  MicOff, 
+  Sparkles, 
+  MessageSquare, 
+  Radio, 
+  ChevronRight,
+  ShieldAlert,
+  Activity
 } from 'lucide-react';
 import VoiceOrb from './VoiceOrb';
+import SacredCosmos from './SacredCosmos';
+import PersonaArtBackdrop from './PersonaArtBackdrop';
 import { useDharmaAudio } from '../lib/useDharmaAudio';
+import { playSingingBowl, playSageChime, toggleMute as toggleGlobalMute, isMuted as isGlobalMuted } from '../lib/sacredAudio';
 
-// ─── Persona Themes (Living Nebula Edition) ──────────────────────────────────
-const MODES = {
+const PERSONAS = {
   krishna: {
-    name: 'Krishna',
-    title: 'Divine Counsel',
-    accent: 'var(--color-primary)',
-    icon: <Shield size={18} />,
-    bg: 'bg-surface-container-lowest',
-    nebulaColor: 'rgba(133, 173, 255, 0.12)', // primary
-    particleColor: 'var(--color-primary)',
-    tagline: 'The Eternal Truth of the Gita',
-    statusPrefix: 'Vasudeva is',
+    id: 'krishna',
+    name: 'Lord Krishna',
+    title: 'The Yogeshvara & Master Strategist',
+    tradition: 'Bhagavad Gita',
+    color: '#60a5fa',
+    gold: '#f59e0b',
+    icon: '🪷',
+    tagline: 'Focus on duty, release attachment to the fruits.',
+    statusPrefix: 'Lord Krishna is'
   },
   chanakya: {
-    name: 'Chanakya',
-    title: 'Strategic Mind',
-    accent: '#ff4d4d',
-    icon: <Zap size={18} />,
-    bg: 'bg-surface-container-lowest',
-    nebulaColor: 'rgba(255, 77, 77, 0.12)',
-    particleColor: '#ff4d4d',
-    tagline: 'The Arthashastra Strategy',
-    statusPrefix: 'Acharya is',
+    id: 'chanakya',
+    name: 'Acharya Chanakya',
+    title: 'The Kingmaker & Master Tactician',
+    tradition: 'Arthashastra & Neeti',
+    color: '#f87171',
+    gold: '#f97316',
+    icon: '📜',
+    tagline: 'Master power, strategy, and self-discipline.',
+    statusPrefix: 'Acharya is'
   },
   laxmibai: {
-    name: 'Laxmibai',
-    title: 'Warrior Spirit',
-    accent: '#ffb74d',
-    icon: <Flame size={18} />,
-    bg: 'bg-surface-container-lowest',
-    nebulaColor: 'rgba(255, 183, 77, 0.12)',
-    particleColor: '#ffb74d',
-    tagline: 'Courage of the Jhansi Queen',
-    statusPrefix: 'The Maharani is',
-  },
+    id: 'laxmibai',
+    name: 'Rani Laxmibai',
+    title: 'The Fearless Warrior Queen of Jhansi',
+    tradition: 'Valor & Righteous Defiance',
+    color: '#fbbf24',
+    gold: '#ef4444',
+    icon: '⚔️',
+    tagline: 'Main apni Jhansi nahi doongi — Stand unshakable.',
+    statusPrefix: 'Rani Laxmibai is'
+  }
 };
 
-// ─── Component: AtmosphericNebula ───────────────────────────────────────────
-const AtmosphericNebula = ({ color }) => (
-  <div className="absolute inset-0 z-0 pointer-events-none">
-    <div 
-      className="absolute top-1/4 left-1/4 w-[500px] h-[500px] rounded-full orb-glow" 
-      style={{ background: color }}
-    />
-    <div 
-      className="absolute bottom-1/4 right-1/4 w-[600px] h-[600px] rounded-full orb-glow" 
-      style={{ background: color, animationDelay: '-5s' }}
-    />
-    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-[radial-gradient(circle_at_center,rgba(19,19,19,0)_0%,rgba(14,14,14,1)_85%)]" />
-  </div>
-);
+const VoicePage = ({ activeMode = 'krishna', onBack }) => {
+  const [currentPersonaKey, setCurrentPersonaKey] = useState(activeMode || 'krishna');
+  const persona = PERSONAS[currentPersonaKey] || PERSONAS.krishna;
 
-// ─── Component: SacredParticles ─────────────────────────────────────────────
-const SacredParticles = ({ color }) => {
-  const count = 30;
-  const particles = useMemo(() => {
-    return Array.from({ length: count }, (_, i) => ({
-      id: i,
-      x: Math.random() * 100,
-      y: Math.random() * 100,
-      size: Math.random() * 3 + 1,
-      duration: Math.random() * 15 + 10,
-      delay: Math.random() * -20,
-    }));
-  }, [color]);
+  const [transcript, setTranscript] = useState([
+    { 
+      role: 'ai', 
+      text: "Mere priya dost... main yahan hoon. Btaiye, aaj kya chal raha hai aapke mann mein?" 
+    }
+  ]);
+  const [isMicMuted, setIsMicMuted] = useState(false);
+  const [showTranscript, setShowTranscript] = useState(true);
+  const [soundMuted, setSoundMuted] = useState(isGlobalMuted());
+  const transcriptScrollRef = useRef(null);
 
-  return (
-    <div className="absolute inset-0 pointer-events-none overflow-hidden z-0 opacity-40">
-      {particles.map(p => (
-        <div
-          key={p.id}
-          className="absolute rounded-full"
-          style={{
-            left: `${p.x}%`,
-            top: `${p.y}%`,
-            width: `${p.size}px`,
-            height: `${p.size}px`,
-            background: color,
-            boxShadow: `0 0 10px ${color}`,
-            animation: `float ${p.duration}s infinite linear`,
-            animationDelay: `${p.delay}s`,
-            opacity: 0.4
-          }}
-        />
-      ))}
-    </div>
-  );
-};
-
-// ─── Main Component ──────────────────────────────────────────────────────────
-const VoicePage = ({ activeMode, personaIdx, onBack }) => {
-  const resolvedPersona = activeMode || personaIdx || 'krishna';
-  const mode = MODES[resolvedPersona] || MODES.krishna;
   const audio = useDharmaAudio({
-    persona: resolvedPersona,
+    persona: currentPersonaKey,
     onTranscriptionReceived: (text, role) => {
-        setTranscript(prev => {
-            if (prev.length === 0) return [{ role, text }];
-            const last = prev[prev.length - 1];
-            
-            // If the same role is speaking, manage the string intelligently
-            if (last.role === role) {
-                if (role === 'user') {
-                    // User text comes from WebSpeechAPI which emits the FULL growing sentence.
-                    // Replace the string rather than appending it.
-                    // If the new text is significantly shorter, it means the VAD reset the engine for a new sentence!
-                    if (text.length < last.text.length * 0.5 && text.length > 0) {
-                        return [...prev, { role, text }];
-                    }
-                    const updatedLast = { ...last, text };
-                    return [...prev.slice(0, -1), updatedLast];
-                } else {
-                    // AI text comes from WebSocket as distinct word chunks. Append them.
-                    if (last.text.endsWith(text)) return prev;
-                    const updatedLast = { ...last, text: last.text + " " + text };
-                    return [...prev.slice(0, -1), updatedLast];
-                }
+      setTranscript(prev => {
+        if (prev.length === 0) return [{ role, text }];
+        const last = prev[prev.length - 1];
+
+        if (last.role === role) {
+          if (role === 'user') {
+            if (text.length < last.text.length * 0.5 && text.length > 0) {
+              return [...prev, { role, text }];
             }
-            
-            return [...prev, { role, text }];
-        });
+            const updated = { ...last, text };
+            return [...prev.slice(0, -1), updated];
+          } else {
+            if (last.text.endsWith(text)) return prev;
+            const updated = { ...last, text: last.text + " " + text };
+            return [...prev.slice(0, -1), updated];
+          }
+        }
+        return [...prev, { role, text }];
+      });
     },
     onVerseReceived: (ref, verse) => {
-        setTranscript(prev => [...prev, { role: 'ai', text: `[${ref}] ${verse}` }]);
+      setTranscript(prev => [...prev, { role: 'ai', text: `[${ref}] ${verse}` }]);
     }
   });
-  const scrollRef = useRef(null);
 
-  // Cleanup: stop audio session when the component unmounts
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
       audio.stop();
@@ -155,172 +106,553 @@ const VoicePage = ({ activeMode, personaIdx, onBack }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Real live transcript managed via useDharmaAudio callbacks
-  const [transcript, setTranscript] = useState([
-    { role: 'ai', text: "Mere priya dost... main yahan hoon. Batao, aaj kya chal raha hai tumhare mann mein?" },
-  ]);
-
-  const [isMuted, setIsMuted] = useState(false);
-
-  const statusInfo = useMemo(() => {
-    switch (audio.state) {
-      case 'connecting': return { text: 'INITIALIZING', sub: 'ALIGNING DHARMA ENGINE' };
-      case 'error':      return { text: 'CONNECTION FAILED', sub: audio.error || 'PLEASE RETRY' };
-      case 'listening':  return { text: `${mode.statusPrefix.toUpperCase()} LISTENING`, sub: 'SHARE YOUR WISDOM' };
-      case 'speaking':   return { text: `${mode.statusPrefix.toUpperCase()} SPEAKING`, sub: 'HEED THE ANCIENT WORDS' };
-      case 'thinking':
-      case 'processing': return { text: 'CONTEMPLATING', sub: 'BROWSING SACRED TEXTS' };
-      case 'recording':  return { text: 'HEARING YOU', sub: 'SPEAK YOUR MIND' };
-      default:           return { text: 'PRESENCE ESTABLISHED', sub: 'READY FOR COUNSEL' };
+  // Auto scroll transcript
+  useEffect(() => {
+    if (transcriptScrollRef.current) {
+      transcriptScrollRef.current.scrollTop = transcriptScrollRef.current.scrollHeight;
     }
-  }, [audio.state, mode.statusPrefix]);
+  }, [transcript]);
 
-  const personaColor = mode.accent;
+  const handleSwitchPersona = (key) => {
+    if (key !== currentPersonaKey) {
+      setCurrentPersonaKey(key);
+      playSageChime(key);
+      if (audio.state !== 'idle') {
+        audio.stop();
+      }
+    }
+  };
+
+  const handleToggleSound = () => {
+    const next = toggleGlobalMute();
+    setSoundMuted(next);
+    if (!next) playSingingBowl(528);
+  };
+
+  const statusDisplay = useMemo(() => {
+    switch (audio.state) {
+      case 'connecting':
+        return {
+          title: 'CONNECTING SANCTUARY',
+          subtitle: 'Aligning with the ancient scripture stream...',
+          badge: 'Connecting',
+          badgeColor: '#f59e0b'
+        };
+      case 'listening':
+        return {
+          title: `${persona.name.toUpperCase()} IS LISTENING`,
+          subtitle: 'Speak your burden openly. VAD detects your voice naturally.',
+          badge: 'Listening',
+          badgeColor: '#38bdf8'
+        };
+      case 'recording':
+        return {
+          title: 'HEARING YOUR DILEMMA',
+          subtitle: 'Transcribing your words into the stream of counsel...',
+          badge: 'Transcribing',
+          badgeColor: '#4ade80'
+        };
+      case 'processing':
+      case 'thinking':
+        return {
+          title: 'CONTEMPLATING THE SCRIPTURES',
+          subtitle: 'Consulting the Gita, Mahabharata & Arthashastra...',
+          badge: 'Contemplating',
+          badgeColor: '#f59e0b'
+        };
+      case 'speaking':
+        return {
+          title: `${persona.name.toUpperCase()} IS SPEAKING`,
+          subtitle: 'Heed the timeless words of righteousness...',
+          badge: 'Speaking',
+          badgeColor: persona.color
+        };
+      case 'error':
+        return {
+          title: 'COMMUNICATION NOTICE',
+          subtitle: audio.error || 'Connection interrupted. Tap retry to reconnect.',
+          badge: 'Offline',
+          badgeColor: '#f87171'
+        };
+      default:
+        return {
+          title: 'SANCTUARY READY',
+          subtitle: `Inquire of ${persona.name} via real-time speech`,
+          badge: 'Online',
+          badgeColor: '#4ade80'
+        };
+    }
+  }, [audio.state, audio.error, persona]);
 
   return (
-    <div className={`relative w-full h-screen flex transition-colors duration-1000 overflow-hidden ${mode.bg}`}>
-      
-      {/* ── Atmospheric Layers ────────────────────────────────────────────── */}
-      <AtmosphericNebula color={mode.nebulaColor} />
-      <SacredParticles color={mode.particleColor} />
-      <div className="pointer-events-none fixed inset-0 z-[5] opacity-20 mix-blend-screen overflow-hidden">
-        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1550684848-fac1c5b4e853?auto=format&fit=crop&q=80&w=2000')] bg-cover opacity-10 filter grayscale contrast-150" />
-      </div>
+    <div style={{
+      position: 'relative',
+      width: '100vw',
+      height: '100vh',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      overflow: 'hidden',
+      color: '#fff',
+      padding: '1.5rem 2rem'
+    }}>
+      {/* Living Cosmic Canvas with Sacred Embers & Sacred Geometry */}
+      <SacredCosmos activeMode={currentPersonaKey} intensity="high" />
 
-      {/* ── TopAppBar ──────────────────────────────────────────────────────── */}
-      <header className="fixed top-0 w-full flex justify-between items-center px-16 py-8 z-50 bg-transparent">
-        <div className="flex items-center gap-4">
-          <span className="text-2xl font-black bg-gradient-to-r from-[#85adff] to-[#c180ff] bg-clip-text text-transparent font-display tracking-tight">DharmaGPT</span>
+      {/* Living Persona Silhouette Artwork Backdrop */}
+      <PersonaArtBackdrop
+        persona={currentPersonaKey}
+        variant="voice"
+        isSpeaking={audio.state === 'speaking' || audio.state === 'recording'}
+      />
+
+      {/* ─── Top Header & Controls ────────────────────────────────────────── */}
+      <header style={{
+        width: '100%',
+        maxWidth: '1200px',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        zIndex: 20
+      }}>
+        {/* Back to Text Sanctuary */}
+        <button
+          onClick={() => {
+            audio.stop();
+            onBack();
+          }}
+          style={{
+            background: 'rgba(255, 255, 255, 0.08)',
+            border: '1px solid rgba(255, 255, 255, 0.15)',
+            borderRadius: '14px',
+            padding: '10px 18px',
+            color: '#fff',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            cursor: 'pointer',
+            fontSize: '0.9rem',
+            fontWeight: '600',
+            backdropFilter: 'blur(20px)',
+            transition: 'all 0.3s ease'
+          }}
+          onMouseOver={(e) => {
+            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)';
+            e.currentTarget.style.transform = 'translateX(-2px)';
+          }}
+          onMouseOut={(e) => {
+            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
+            e.currentTarget.style.transform = 'translateX(0)';
+          }}
+        >
+          <ArrowLeft size={18} />
+          <span>Text Sanctuary</span>
+        </button>
+
+        {/* Mid-Session Sage Switcher */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          background: 'rgba(15, 23, 42, 0.75)',
+          padding: '6px 10px',
+          borderRadius: '40px',
+          border: '1px solid rgba(255, 255, 255, 0.12)',
+          backdropFilter: 'blur(30px)',
+          boxShadow: '0 10px 30px rgba(0, 0, 0, 0.5)'
+        }}>
+          {Object.values(PERSONAS).map(p => {
+            const isSelected = p.id === currentPersonaKey;
+            return (
+              <button
+                key={p.id}
+                onClick={() => handleSwitchPersona(p.id)}
+                style={{
+                  background: isSelected
+                    ? `linear-gradient(135deg, ${p.color}30 0%, ${p.gold}40 100%)`
+                    : 'transparent',
+                  border: isSelected ? `1px solid ${p.color}80` : '1px solid transparent',
+                  borderRadius: '25px',
+                  padding: '7px 16px',
+                  color: isSelected ? '#fff' : 'rgba(255, 255, 255, 0.5)',
+                  fontSize: '0.85rem',
+                  fontWeight: isSelected ? '700' : '500',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  transition: 'all 0.3s ease',
+                  boxShadow: isSelected ? `0 0 20px ${p.color}40` : 'none'
+                }}
+              >
+                <span>{p.icon}</span>
+                <span className="hidden-mobile">{p.name}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Right Action Icons */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <button
+            onClick={() => setShowTranscript(prev => !prev)}
+            title="Toggle Live Transcript Scroll"
+            style={{
+              background: showTranscript ? 'rgba(245, 158, 11, 0.2)' : 'rgba(255, 255, 255, 0.08)',
+              border: `1px solid ${showTranscript ? 'rgba(245, 158, 11, 0.4)' : 'rgba(255, 255, 255, 0.15)'}`,
+              borderRadius: '12px',
+              padding: '10px',
+              color: showTranscript ? '#fbbf24' : '#fff',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              backdropFilter: 'blur(20px)'
+            }}
+          >
+            <Activity size={18} />
+          </button>
+
+          <button
+            onClick={handleToggleSound}
+            title={soundMuted ? 'Unmute' : 'Mute'}
+            style={{
+              background: 'rgba(255, 255, 255, 0.08)',
+              border: '1px solid rgba(255, 255, 255, 0.15)',
+              borderRadius: '12px',
+              padding: '10px',
+              color: soundMuted ? 'rgba(255,255,255,0.4)' : '#fbbf24',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              backdropFilter: 'blur(20px)'
+            }}
+          >
+            {soundMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
+          </button>
         </div>
       </header>
 
-      {/* ── SideNavBar (Asymmetric Left) ──────────────────────────────────── */}
-
-
-      {/* ── Main Canvas (Center) ──────────────────────────────────────────── */}
-      <main className="relative flex-grow h-full flex flex-col items-center justify-center z-10 px-24">
-        
-        {/* Central Physical Orb ────────────────────────────────────────── */}
-        <div className="relative group mb-20">
-          {/* Nebula Backglow */}
-          <div 
-            className="absolute inset-0 blur-3xl opacity-30 scale-150 transition-opacity duration-1000" 
-            style={{ background: `radial-gradient(circle, ${mode.accent} 0%, transparent 70%)` }}
+      {/* ─── Center Sanctuary: The Living Orb & Presence ─────────────────── */}
+      <main style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 10,
+        margin: 'auto 0'
+      }}>
+        {/* The 3D Living Sacred Orb */}
+        <div style={{ position: 'relative', marginBottom: '2rem' }}>
+          <VoiceOrb
+            state={audio.state}
+            freqData={audio.freqData}
+            persona={currentPersonaKey}
+            size={360}
+            onClick={audio.state === 'speaking' ? audio.interrupt : undefined}
           />
-          
-          <div className="relative w-80 h-80 rounded-full orb-container flex items-center justify-center overflow-visible z-20">
-            <div className="absolute inset-0 bg-transparent pointer-events-none" />
-            
-            <VoiceOrb
-              state={audio.state}
-              freqData={audio.freqData}
-              personaColor={personaColor}
-              size={340}
-              onClick={audio.state === 'speaking' ? audio.interrupt : undefined}
-            />
-          </div>
         </div>
 
-        {/* Status Text ────────────────────────────────────────────────── */}
-        <div className="text-center space-y-4">
-          <div className="flex items-center justify-center gap-3 mb-2 animate-fade-up">
-            <span className="text-[12px] font-black tracking-[8px] uppercase text-primary opacity-40">Dharma Session</span>
-            <div 
-              className="px-3 py-1 font-display text-[10px] font-bold uppercase tracking-widest rounded-full" 
-              style={{ background: `${mode.accent}15`, color: mode.accent, border: `1px solid ${mode.accent}30` }}
-            >
-              {mode.name}
-            </div>
+        {/* Presence Status Narrative */}
+        <div style={{ textAlign: 'center', maxWidth: '650px', padding: '0 1rem' }}>
+          {/* Persona Seal Badge */}
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '6px 18px',
+            borderRadius: '30px',
+            background: 'rgba(0, 0, 0, 0.5)',
+            border: `1px solid ${persona.color}60`,
+            marginBottom: '1rem',
+            boxShadow: `0 0 20px ${persona.color}30`
+          }}>
+            <span style={{ fontSize: '1rem' }}>{persona.icon}</span>
+            <span style={{
+              fontSize: '0.8rem',
+              fontWeight: '700',
+              textTransform: 'uppercase',
+              letterSpacing: '2px',
+              color: persona.color
+            }}>
+              {persona.name} • {statusDisplay.badge}
+            </span>
           </div>
-          <h1 className="text-headline-lg text-white/90 uppercase tracking-tight" style={{ fontSize: '2.5rem' }}>
-            {statusInfo.text}
+
+          <h1 style={{
+            fontSize: 'clamp(1.8rem, 4vw, 2.5rem)',
+            fontWeight: '800',
+            fontFamily: 'var(--font-display)',
+            letterSpacing: '-0.02em',
+            marginBottom: '0.6rem',
+            color: '#ffffff'
+          }}>
+            {statusDisplay.title}
           </h1>
-          <p className="text-body-lg text-white/40 max-w-lg mx-auto">
-            {statusInfo.sub}
+
+          <p style={{
+            fontSize: '1rem',
+            color: 'rgba(255, 255, 255, 0.6)',
+            lineHeight: '1.6',
+            marginBottom: '1.75rem'
+          }}>
+            {statusDisplay.subtitle}
           </p>
 
+          {/* Primary Action Button (When Idle, Error or Connecting) */}
           {(audio.state === 'idle' || audio.state === 'error' || audio.state === 'connecting') && (
-            <div className="mt-8 animate-fade-up" style={{ animationDelay: '0.2s', marginTop: '2rem' }}>
-                <button
-                    onClick={() => {
-                      if (audio.state === 'connecting') {
-                        audio.stop();
-                      } else {
-                        audio.start();
-                      }
-                    }}
-                    className="px-8 py-4 rounded-full font-bold uppercase tracking-widest text-sm outline-none transition-all duration-300 pointer-events-auto"
-                    style={{
-                        background: audio.state === 'connecting' ? '#555' : mode.accent,
-                        color: audio.state === 'connecting' ? '#fff' : '#000',
-                        boxShadow: `0 0 40px ${mode.accent}40`,
-                        border: 'none',
-                        cursor: 'pointer'
-                    }}
-                    onMouseOver={e => { e.currentTarget.style.transform = 'scale(1.05)'; }}
-                    onMouseOut={e => { e.currentTarget.style.transform = 'scale(1)'; }}
-                >
-                    {audio.state === 'error' ? '⟳ Retry Voice Connection' : 
-                     audio.state === 'connecting' ? '✕ Cancel' :
-                     'Begin Voice Counsel'}
-                </button>
-            </div>
+            <button
+              onClick={() => {
+                if (audio.state === 'connecting') {
+                  audio.stop();
+                } else {
+                  playSingingBowl(528);
+                  audio.start();
+                }
+              }}
+              style={{
+                background: audio.state === 'connecting'
+                  ? 'rgba(255, 255, 255, 0.15)'
+                  : `linear-gradient(135deg, ${persona.gold} 0%, #d97706 100%)`,
+                color: audio.state === 'connecting' ? '#fff' : '#000',
+                padding: '1.1rem 2.8rem',
+                borderRadius: '40px',
+                fontSize: '1.05rem',
+                fontWeight: '800',
+                letterSpacing: '1px',
+                border: 'none',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '12px',
+                boxShadow: `0 10px 40px ${persona.color}40`,
+                transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.transform = 'scale(1.05)';
+                e.currentTarget.style.boxShadow = `0 15px 50px ${persona.color}60`;
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.transform = 'scale(1)';
+                e.currentTarget.style.boxShadow = `0 10px 40px ${persona.color}40`;
+              }}
+            >
+              <Mic size={20} />
+              <span>
+                {audio.state === 'error'
+                  ? 'RETRY VOICE CONNECTION'
+                  : audio.state === 'connecting'
+                  ? 'CANCELING...'
+                  : 'BEGIN VOICE COUNSEL'}
+              </span>
+            </button>
+          )}
+
+          {/* When Sage is speaking, offer instant interruption */}
+          {audio.state === 'speaking' && (
+            <button
+              onClick={audio.interrupt}
+              style={{
+                background: 'rgba(255, 255, 255, 0.1)',
+                border: '1px solid rgba(255, 255, 255, 0.25)',
+                color: '#fff',
+                padding: '10px 24px',
+                borderRadius: '30px',
+                fontSize: '0.85rem',
+                fontWeight: '700',
+                cursor: 'pointer',
+                backdropFilter: 'blur(20px)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                transition: 'all 0.3s ease'
+              }}
+              onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'}
+              onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
+            >
+              <span>Tap to Interrupt & Speak</span>
+            </button>
           )}
         </div>
       </main>
 
-      {/* ── Transcript Overlay (Asymmetric Right) ────────────────────────── */}
-      <div className="fixed right-12 top-1/2 -translate-y-1/2 w-80 space-y-6 z-20 hidden 2xl:block">
-        <div className="p-8 rounded-[2rem] bg-surface-container-low/40 backdrop-blur-3xl border border-white/5 shadow-2xl animate-fade-in-right">
-          <div className="flex items-center gap-3 mb-6 text-[10px] font-black text-primary tracking-[4px] uppercase">
-            <Activity size={16} />
-            Live Transcript
+      {/* ─── Floating Live Transcript Scroll (Always Accessible) ───────────── */}
+      {showTranscript && (
+        <div style={{
+          position: 'fixed',
+          right: '2rem',
+          top: '50%',
+          transform: 'translateY(-50%)',
+          width: '340px',
+          maxHeight: '45vh',
+          background: 'rgba(15, 23, 42, 0.85)',
+          border: '1px solid rgba(255, 255, 255, 0.12)',
+          borderRadius: '24px',
+          padding: '1.25rem',
+          backdropFilter: 'blur(35px)',
+          WebkitBackdropFilter: 'blur(35px)',
+          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.6)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '12px',
+          zIndex: 30
+        }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+            paddingBottom: '8px'
+          }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              fontSize: '0.75rem',
+              fontWeight: '700',
+              textTransform: 'uppercase',
+              letterSpacing: '2px',
+              color: persona.color
+            }}>
+              <Activity size={14} />
+              <span>Live Dialogue</span>
+            </div>
+            <button
+              onClick={() => setShowTranscript(false)}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: 'rgba(255,255,255,0.4)',
+                cursor: 'pointer',
+                fontSize: '0.75rem'
+              }}
+            >
+              ✕
+            </button>
           </div>
-          <div ref={scrollRef} className="space-y-6 max-h-[40vh] overflow-y-auto pr-4 custom-scrollbar">
-            {transcript.map((item, i) => (
-              <div key={i} className={`space-y-2 ${i < transcript.length - 1 ? 'opacity-40 scale-[0.98]' : 'animate-fade-up'}`}>
-                <p className="text-[9px] font-black uppercase tracking-widest text-[#ababab]">
-                  {item.role === 'ai' ? mode.name : 'You'}
-                </p>
-                <p className="text-sm text-white/80 leading-relaxed font-body">
-                  {item.text}
-                </p>
-              </div>
-            ))}
+
+          <div
+            ref={transcriptScrollRef}
+            style={{
+              overflowY: 'auto',
+              maxHeight: '32vh',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px',
+              paddingRight: '6px'
+            }}
+            className="custom-scrollbar"
+          >
+            {transcript.map((item, idx) => {
+              const isAi = item.role === 'ai';
+              return (
+                <div
+                  key={idx}
+                  style={{
+                    background: isAi ? 'rgba(0, 0, 0, 0.35)' : 'rgba(255, 255, 255, 0.05)',
+                    borderLeft: isAi ? `3px solid ${persona.color}` : '3px solid rgba(255,255,255,0.3)',
+                    borderRadius: '0 12px 12px 0',
+                    padding: '8px 12px',
+                    fontSize: '0.88rem',
+                    lineHeight: '1.5'
+                  }}
+                >
+                  <div style={{
+                    fontSize: '0.7rem',
+                    fontWeight: '700',
+                    textTransform: 'uppercase',
+                    letterSpacing: '1px',
+                    color: isAi ? persona.gold : 'rgba(255,255,255,0.5)',
+                    marginBottom: '4px'
+                  }}>
+                    {isAi ? persona.name : 'You'}
+                  </div>
+                  <div style={{ color: 'rgba(255,255,255,0.9)' }}>
+                    {item.text}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
+      )}
 
-      </div>
-
-      {/* ── Bottom Navigation Bar ─────────────────────────────────────────── */}
-      <nav className="fixed bottom-10 left-1/2 -translate-x-1/2 flex items-center justify-center gap-12 px-10 py-5 z-[70] min-w-[200px] rounded-[3rem] bg-[#111]/40 backdrop-blur-3xl shadow-[0_40px_100px_rgba(0,0,0,0.8)] border border-white/[0.08] animate-fade-up">
-        
-        <button 
+      {/* ─── Bottom Sanctuary Navigation Console ───────────────────────────── */}
+      <footer style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '24px',
+        background: 'rgba(15, 23, 42, 0.85)',
+        border: '1px solid rgba(255, 255, 255, 0.12)',
+        padding: '12px 32px',
+        borderRadius: '50px',
+        backdropFilter: 'blur(35px)',
+        WebkitBackdropFilter: 'blur(35px)',
+        boxShadow: '0 20px 60px rgba(0, 0, 0, 0.7)',
+        zIndex: 25,
+        marginBottom: '1rem'
+      }}>
+        {/* Mic Toggle */}
+        <button
           onClick={() => {
-            const newState = !isMuted;
-            setIsMuted(newState);
-            if (audio.setMuted) audio.setMuted(newState);
+            const next = !isMicMuted;
+            setIsMicMuted(next);
+            if (audio.setMuted) audio.setMuted(next);
           }}
-          className="group flex flex-col items-center gap-1.5 text-[#ababab] p-3 hover:bg-white/5 rounded-full transition-all duration-300"
+          title={isMicMuted ? 'Unmute Microphone' : 'Mute Microphone'}
+          style={{
+            background: isMicMuted ? 'rgba(239, 68, 68, 0.2)' : 'rgba(255, 255, 255, 0.08)',
+            border: `1px solid ${isMicMuted ? '#ef4444' : 'rgba(255, 255, 255, 0.15)'}`,
+            borderRadius: '50%',
+            width: '50px',
+            height: '50px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: isMicMuted ? '#f87171' : '#fff',
+            cursor: 'pointer',
+            transition: 'all 0.3s ease'
+          }}
+          onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.08)'}
+          onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
         >
-          <div className="group-active:scale-90 transition-transform">
-            {isMuted ? <VolumeX size={24} /> : <Volume2 size={24} />}
-          </div>
-          <span className="text-[8px] font-black uppercase tracking-[2px] opacity-60">Mute</span>
+          {isMicMuted ? <MicOff size={22} /> : <Mic size={22} />}
         </button>
 
-        <button 
+        {/* End Call / Return to Chat */}
+        <button
           onClick={() => {
             audio.stop();
             setTimeout(onBack, 150);
           }}
-          className="bg-gradient-to-r from-[#ff716c] to-[#9f0519] text-white rounded-full w-16 h-16 flex items-center justify-center shadow-[0_15px_40px_rgba(255,113,108,0.3)] hover:scale-110 active:scale-95 transition-all duration-300 group"
+          title="End Voice Sanctuary"
+          style={{
+            background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+            border: 'none',
+            borderRadius: '50%',
+            width: '60px',
+            height: '60px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#fff',
+            cursor: 'pointer',
+            boxShadow: '0 10px 30px rgba(239, 68, 68, 0.5)',
+            transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
+          }}
+          onMouseOver={(e) => {
+            e.currentTarget.style.transform = 'scale(1.1) rotate(6deg)';
+            e.currentTarget.style.boxShadow = '0 15px 40px rgba(239, 68, 68, 0.7)';
+          }}
+          onMouseOut={(e) => {
+            e.currentTarget.style.transform = 'scale(1) rotate(0deg)';
+            e.currentTarget.style.boxShadow = '0 10px 30px rgba(239, 68, 68, 0.5)';
+          }}
         >
-          <PhoneOff size={32} strokeWidth={2.5} className="group-hover:rotate-12 transition-transform" />
+          <PhoneOff size={28} />
         </button>
-
-      </nav>
-
+      </footer>
     </div>
   );
 };

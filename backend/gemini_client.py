@@ -17,8 +17,8 @@ from system_prompt import get_system_prompt
 logger = logging.getLogger(__name__)
 
 # Primary model: ultra-fast and optimized for high-throughput counsel
-MODEL_NAME = "gemini-3.5-flash-lite"
-FALLBACK_MODELS = ["gemini-3.1-flash-lite-preview", "gemini-flash-latest"]
+MODEL_NAME = "gemini-2.0-flash"
+FALLBACK_MODELS = ["gemini-1.5-flash", "gemini-flash-latest"]
 
 _client: genai.Client | None = None
 _last_api_key: str | None = None
@@ -146,7 +146,7 @@ async def generate_persona_response_async(
     config = types.GenerateContentConfig(
         system_instruction=system_instruction,
         temperature=0.85 if is_voice_mode else 0.7,
-        max_output_tokens=200 if is_voice_mode else 1200,
+        max_output_tokens=200 if is_voice_mode else 450,
         top_p=0.95,
     )
 
@@ -183,7 +183,7 @@ def generate_persona_response(
     config = types.GenerateContentConfig(
         system_instruction=system_instruction,
         temperature=0.85 if is_voice_mode else 0.7,
-        max_output_tokens=200 if is_voice_mode else 1200,
+        max_output_tokens=200 if is_voice_mode else 450,
         top_p=0.95,
     )
 
@@ -223,7 +223,7 @@ async def stream_persona_response(
     config = types.GenerateContentConfig(
         system_instruction=system_instruction,
         temperature=0.85 if is_voice_mode else 0.7,
-        max_output_tokens=200 if is_voice_mode else 1200,
+        max_output_tokens=200 if is_voice_mode else 450,
         top_p=0.95,
     )
 

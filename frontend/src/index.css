@@ -589,3 +589,24 @@ body {
     background: rgba(133, 173, 255, 0.3);
     border-radius: 10px;
 }
+
+@keyframes spinChakra {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes spinChakraReverse {
+  from { transform: rotate(360deg); }
+  to { transform: rotate(0deg); }
+}
+
+@keyframes chakraAuraPulse {
+  0%, 100% {
+    transform: scale(0.96);
+    opacity: 0.65;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 0.95;
+  }
+}
