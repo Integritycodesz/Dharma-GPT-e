@@ -205,7 +205,7 @@ const Home = ({ onStart, onStartVoice }) => {
         </div>
       </nav>
 
-      {/* Hero Section — Magnificent Sudarshana Chakra with Action Buttons Below */}
+      {/* Hero Section — Lord Krishna Vishwaroopa with Dimmed Rotating Sudarshana Chakra Halo */}
       <div style={{
         maxWidth: '1000px',
         width: '100%',
@@ -213,52 +213,88 @@ const Home = ({ onStart, onStartVoice }) => {
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        margin: '2rem 0 3.5rem',
+        margin: '1.25rem 0 3.5rem',
         zIndex: 10
       }}>
-        {/* The Grand Rotating Sudarshana Chakra */}
+        {/* Divine Composition Stage: Vishwaroopa Figure with Dimmed Rotating Chakra Behind */}
         <div style={{
           position: 'relative',
-          width: 'min(460px, 76vw)',
-          height: 'min(460px, 76vw)',
+          width: 'min(440px, 82vw)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center'
         }}>
-          {/* Subtle Outer Concentric Sacred Geometry Ring */}
+          {/* 1. Behind the Figure: Dimmed Rotating Sudarshana Chakra Halo */}
           <div style={{
             position: 'absolute',
-            inset: '-18px',
-            borderRadius: '50%',
-            border: '1px dashed rgba(245, 158, 11, 0.28)',
-            boxShadow: '0 0 25px rgba(245, 158, 11, 0.1)',
-            animation: 'spinChakraReverse 80s linear infinite',
+            top: '22%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            width: 'min(440px, 78vw)',
+            height: 'min(440px, 78vw)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1,
             pointerEvents: 'none'
-          }} />
+          }}>
+            {/* Subtle Outer Concentric Sacred Geometry Ring */}
+            <div style={{
+              position: 'absolute',
+              inset: '-15px',
+              borderRadius: '50%',
+              border: '1px dashed rgba(245, 158, 11, 0.22)',
+              boxShadow: '0 0 25px rgba(245, 158, 11, 0.08)',
+              animation: 'spinChakraReverse 80s linear infinite'
+            }} />
 
-          {/* Ultra-High Definition Rotating Chakra Disc */}
+            {/* Rotating Dimmed Cosmic Chakra Disc */}
+            <div style={{
+              width: '100%',
+              height: '100%',
+              backgroundImage: 'url(/chakra-hd.png)',
+              backgroundSize: 'contain',
+              backgroundPosition: 'center',
+              backgroundRepeat: 'no-repeat',
+              opacity: 0.36,
+              filter: 'contrast(1.2) brightness(1.05) drop-shadow(0 0 25px rgba(245, 158, 11, 0.35)) drop-shadow(0 0 50px rgba(59, 130, 246, 0.25))',
+              animation: 'spinChakra 35s linear infinite'
+            }} />
+
+            {/* Soft Ambient Golden Core Glow */}
+            <div style={{
+              position: 'absolute',
+              width: '90px',
+              height: '90px',
+              borderRadius: '50%',
+              background: 'radial-gradient(circle, rgba(245, 158, 11, 0.3) 0%, rgba(234, 88, 12, 0.12) 50%, transparent 80%)',
+              filter: 'blur(14px)',
+              animation: 'chakraAuraPulse 4s ease-in-out infinite'
+            }} />
+          </div>
+
+          {/* 2. In Front: Lord Krishna Vishwaroopa Divine Cosmic Artwork */}
           <div style={{
+            position: 'relative',
+            zIndex: 2,
             width: '100%',
-            height: '100%',
-            backgroundImage: 'url(/chakra-hd.png)',
-            backgroundSize: 'contain',
-            backgroundPosition: 'center',
-            backgroundRepeat: 'no-repeat',
-            filter: 'contrast(1.15) brightness(1.05) drop-shadow(0 0 22px rgba(245, 158, 11, 0.45)) drop-shadow(0 0 50px rgba(234, 88, 12, 0.25))',
-            animation: 'spinChakra 30s linear infinite'
-          }} />
-
-          {/* Central Luminous Jewel Hub Glow */}
-          <div style={{
-            position: 'absolute',
-            width: 'min(70px, 12vw)',
-            height: 'min(70px, 12vw)',
-            borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(255, 255, 245, 0.95) 0%, rgba(245, 158, 11, 0.45) 45%, transparent 75%)',
-            filter: 'blur(6px)',
-            animation: 'chakraAuraPulse 3s ease-in-out infinite',
-            pointerEvents: 'none'
-          }} />
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center'
+          }}>
+            <img
+              src="/vishwaroopa.png"
+              alt="Lord Krishna Vishwaroopa"
+              style={{
+                width: '100%',
+                maxHeight: 'min(500px, 60vh)',
+                objectFit: 'contain',
+                filter: 'drop-shadow(0 0 25px rgba(255, 255, 255, 0.18)) drop-shadow(0 0 50px rgba(245, 158, 11, 0.2))',
+                pointerEvents: 'none',
+                userSelect: 'none'
+              }}
+            />
+          </div>
         </div>
 
         {/* Primary CTA Buttons — Guaranteed Zero Overlap Directly Below Chakra */}
