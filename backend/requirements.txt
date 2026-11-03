@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+chromadb
+pydantic
+pydantic-settings
+python-dotenv
+websockets
+sse-starlette
+edge-tts
+google-genai
