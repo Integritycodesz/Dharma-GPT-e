@@ -261,22 +261,27 @@ async def transcribe_audio_async(audio_bytes: bytes) -> str:
     """
     client = _get_client()
 
-    # 1. Try Gemini Multimodal Audio (fast, cloud-based, zero local RAM consumption)
-    try:
-        audio_part = types.Part.from_bytes(data=audio_bytes, mime_type="audio/webm")
-        prompt = (
-            "Transcribe this speech into text verbatim. "
-            "Output ONLY the exact spoken words in Hindi/Hinglish/English. "
-            "Do not add commentary, notes, or explanations."
-        )
-        resp = await client.aio.models.generate_content(
-            model=MODEL_NAME,
-            contents=[audio_part, prompt],
-        )
-        if resp.text:
-            return resp.text.strip()
-    except Exception as e:
-        logger.warning(f"Gemini audio transcription failed: {e}. Attempting local Whisper...")
+    # 1. Try Gemini Multimodal Audio across models and common audio formats
+    prompt = (
+        "Transcribe this speech into text verbatim. "
+        "Output ONLY the exact spoken words in Hindi/Hinglish/English. "
+        "Do not add commentary, notes, or explanations."
+    )
+    models_to_try = [MODEL_NAME] + FALLBACK_MODELS
+
+    for m in models_to_try:
+        for mime in ("audio/webm", "audio/mp4", "audio/wav", "audio/ogg"):
+            try:
+                audio_part = types.Part.from_bytes(data=audio_bytes, mime_type=mime)
+                resp = await client.aio.models.generate_content(
+                    model=m,
+                    contents=[audio_part, prompt],
+                )
+                if resp.text:
+                    return resp.text.strip()
+            except Exception as e:
+                logger.debug(f"Gemini audio transcription ({m}, {mime}) failed: {e}")
+                continue
 
     # 2. Local fallback using faster-whisper if available
     try:
@@ -287,5 +292,5 @@ async def transcribe_audio_async(audio_bytes: bytes) -> str:
 
         return await asyncio.to_thread(_whisper_transcribe)
     except Exception as e:
-        logger.error(f"Local Whisper fallback failed: {e}")
-        raise RuntimeError("Audio transcription failed.")
+        logger.warning(f"Local Whisper fallback not available or failed: {e}")
+        return ""

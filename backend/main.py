@@ -142,123 +142,133 @@ async def voice_session(websocket: WebSocket, persona: str):
     logger.info(f"Voice session started for persona: {persona}")
     sentence_end = re.compile(r'[.?!]\s|[.?!]$|\n')
     md_chars = re.compile(r'[*_#`\[\]]')
+    current_gen_task: asyncio.Task | None = None
+
+    async def run_turn(query_text: str):
+        context = []
+        buffer = ""
+        tts_queue: asyncio.Queue[str | None] = asyncio.Queue()
+
+        async def tts_worker():
+            while True:
+                sentence = await tts_queue.get()
+                if sentence is None:
+                    tts_queue.task_done()
+                    break
+                try:
+                    audio = await asyncio.wait_for(
+                        generate_speech_bytes(sentence, persona),
+                        timeout=6.0
+                    )
+                    if audio:
+                        await websocket.send_bytes(audio)
+                except asyncio.TimeoutError:
+                    logger.warning(f"TTS timed out for: {sentence[:35]}...")
+                except Exception as err:
+                    logger.error(f"TTS generation error: {err}")
+                finally:
+                    tts_queue.task_done()
+
+        tts_task = asyncio.create_task(tts_worker())
+
+        async def queue_sentence(text: str):
+            cleaned = md_chars.sub('', text).strip()
+            if cleaned:
+                # 1. Immediately notify client text for live transcript display
+                await websocket.send_json({"type": "agent_speaking", "text": cleaned + " "})
+                # 2. Queue for background TTS generation
+                await tts_queue.put(cleaned)
+
+        try:
+            async for chunk in stream_persona_response(query_text, context, [], persona, is_voice_mode=True):
+                buffer += chunk
+
+                match = sentence_end.search(buffer)
+                while match:
+                    split_idx = match.end()
+                    sentence = buffer[:split_idx].strip()
+                    buffer = buffer[split_idx:]
+                    if sentence:
+                        await queue_sentence(sentence)
+                    match = sentence_end.search(buffer)
+
+                if len(buffer) > 55 and ', ' in buffer:
+                    last_comma = buffer.rfind(', ')
+                    clause = buffer[:last_comma + 1].strip()
+                    buffer = buffer[last_comma + 2:]
+                    if clause:
+                        await queue_sentence(clause)
+
+            if buffer.strip():
+                await queue_sentence(buffer.strip())
+
+        except asyncio.CancelledError:
+            logger.info(f"[{persona}] Generation cancelled (user interrupt)")
+            raise
+        finally:
+            await tts_queue.put(None)
+            try:
+                await tts_task
+            except asyncio.CancelledError:
+                pass
+
+        await websocket.send_json({"type": "agent_done"})
 
     try:
         while True:
             data = await websocket.receive()
-            user_text = ""
-
-            # Check binary audio or text fallback
             audio_bytes = data.get("bytes")
             text_data = data.get("text")
 
-            if audio_bytes is not None:
-                logger.info(f"[{persona}] Received {len(audio_bytes)} bytes audio. Transcribing...")
-                await websocket.send_json({"type": "agent_thinking"})
-                try:
-                    user_text = await transcribe_audio_async(audio_bytes)
-                    logger.info(f"[{persona}] Transcribed: {user_text}")
-                    await websocket.send_json({"type": "user_transcription", "text": user_text})
-                except Exception as e:
-                    logger.error(f"Transcription error: {e}")
-                    await websocket.send_json({"type": "session_error", "message": "Transcription failed."})
-                    await websocket.send_json({"type": "agent_done"})
-                    continue
-
-            elif text_data is not None:
+            if text_data is not None:
                 try:
                     payload = json.loads(text_data)
                     msg_type = payload.get("type", "")
                     if msg_type == "interrupt":
                         logger.info(f"[{persona}] Interrupted by user.")
+                        if current_gen_task and not current_gen_task.done():
+                            current_gen_task.cancel()
                         continue
                     if msg_type == "user_text":
                         user_text = payload.get("text", "")
-                        logger.info(f"[{persona}] Text fallback: {user_text}")
+                        if not user_text or not user_text.strip():
+                            continue
+                        logger.info(f"[{persona}] Text input: {user_text}")
+                        if current_gen_task and not current_gen_task.done():
+                            current_gen_task.cancel()
                         await websocket.send_json({"type": "agent_thinking"})
-                except Exception:
+                        current_gen_task = asyncio.create_task(run_turn(user_text))
+                        continue
+                except Exception as err:
+                    logger.error(f"Text parse error: {err}")
                     continue
-            else:
-                continue
 
-            if not user_text or not user_text.strip():
-                logger.info(f"[{persona}] Empty input ignored.")
-                continue
-
-            # In voice mode, keep context fast to minimize initial audio delay
-            context = []
-            buffer = ""
-
-            # TTS Pipeline: Producer (LLM stream) -> Queue -> Consumer (TTS generator)
-            tts_queue: asyncio.Queue[str | None] = asyncio.Queue()
-
-            async def tts_worker():
-                """Processes TTS audio concurrently while LLM continues streaming."""
-                while True:
-                    sentence = await tts_queue.get()
-                    if sentence is None:
-                        tts_queue.task_done()
-                        break
-                    try:
-                        audio = await asyncio.wait_for(
-                            generate_speech_bytes(sentence, persona),
-                            timeout=5.0
-                        )
-                        if audio:
-                            await websocket.send_bytes(audio)
-                    except asyncio.TimeoutError:
-                        logger.warning(f"TTS timed out for: {sentence[:35]}...")
-                    except Exception as err:
-                        logger.error(f"TTS generation error: {err}")
-                    finally:
-                        tts_queue.task_done()
-
-            tts_task = asyncio.create_task(tts_worker())
-
-            async def queue_sentence(text: str):
-                cleaned = md_chars.sub('', text).strip()
-                if cleaned:
-                    # 1. Immediately notify client text for live transcript display
-                    await websocket.send_json({"type": "agent_speaking", "text": cleaned + " "})
-                    # 2. Queue for background TTS generation
-                    await tts_queue.put(cleaned)
-
-            try:
-                async for chunk in stream_persona_response(user_text, context, [], persona, is_voice_mode=True):
-                    buffer += chunk
-
-                    # Match sentence boundaries
-                    match = sentence_end.search(buffer)
-                    while match:
-                        split_idx = match.end()
-                        sentence = buffer[:split_idx].strip()
-                        buffer = buffer[split_idx:]
-                        if sentence:
-                            await queue_sentence(sentence)
-                        match = sentence_end.search(buffer)
-
-                    # Early clause splitting for faster initial speech
-                    if len(buffer) > 55 and ', ' in buffer:
-                        last_comma = buffer.rfind(', ')
-                        clause = buffer[:last_comma + 1].strip()
-                        buffer = buffer[last_comma + 2:]
-                        if clause:
-                            await queue_sentence(clause)
-
-                if buffer.strip():
-                    await queue_sentence(buffer.strip())
-
-            finally:
-                # Stop TTS consumer and await completion
-                await tts_queue.put(None)
-                await tts_task
-
-            await websocket.send_json({"type": "agent_done"})
+            elif audio_bytes is not None:
+                logger.info(f"[{persona}] Received {len(audio_bytes)} bytes audio. Transcribing...")
+                if current_gen_task and not current_gen_task.done():
+                    current_gen_task.cancel()
+                await websocket.send_json({"type": "agent_thinking"})
+                try:
+                    user_text = await transcribe_audio_async(audio_bytes)
+                    logger.info(f"[{persona}] Transcribed: {user_text}")
+                    if user_text and user_text.strip():
+                        await websocket.send_json({"type": "user_transcription", "text": user_text})
+                        current_gen_task = asyncio.create_task(run_turn(user_text))
+                    else:
+                        await websocket.send_json({"type": "agent_done"})
+                except Exception as e:
+                    logger.error(f"Transcription error: {e}")
+                    await websocket.send_json({"type": "session_error", "message": "Could not understand audio, please speak again."})
+                    await websocket.send_json({"type": "agent_done"})
 
     except WebSocketDisconnect:
         logger.info(f"Voice session disconnected: {persona}")
+        if current_gen_task and not current_gen_task.done():
+            current_gen_task.cancel()
     except Exception as e:
         logger.error(f"Voice session error: {e}")
+        if current_gen_task and not current_gen_task.done():
+            current_gen_task.cancel()
         try:
             await websocket.send_json({"type": "session_error", "message": str(e)})
         except Exception:

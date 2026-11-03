@@ -98,8 +98,9 @@ const VoicePage = ({ activeMode = 'krishna', onBack }) => {
     }
   });
 
-  // Cleanup on unmount
+  // Auto-connect on mount, cleanup on unmount
   useEffect(() => {
+    audio.start();
     return () => {
       audio.stop();
     };
