@@ -17,8 +17,8 @@ from system_prompt import get_system_prompt
 logger = logging.getLogger(__name__)
 
 # Primary model: ultra-fast and optimized for high-throughput counsel
-MODEL_NAME = "gemini-2.0-flash"
-FALLBACK_MODELS = ["gemini-1.5-flash", "gemini-flash-latest"]
+MODEL_NAME = "gemini-3.5-flash-lite"
+FALLBACK_MODELS = ["gemini-3.5-flash", "gemini-3.6-flash"]
 
 _client: genai.Client | None = None
 _last_api_key: str | None = None
