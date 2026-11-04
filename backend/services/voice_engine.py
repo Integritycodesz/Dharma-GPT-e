@@ -6,22 +6,15 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-import edge_tts
+from dotenv import load_dotenv
 
+load_dotenv()
 log = logging.getLogger(__name__)
 
-# Voice mapping for the local fallback.
-VOICE_MAP = {
-    "krishna": "hi-IN-MadhurNeural",
-    "chanakya": "hi-IN-MadhurNeural",
-    "laxmibai": "hi-IN-SwaraNeural",
-    "default": "en-US-AndrewMultilingualNeural"
-}
-
 VOICE_PROFILES = {
-    "krishna": {"gender": "male", "traits": ("warm", "calm", "gentle", "hindi", "indian")},
-    "chanakya": {"gender": "male", "traits": ("mature", "authoritative", "deep", "hindi", "indian")},
-    "laxmibai": {"gender": "female", "traits": ("confident", "strong", "warm", "hindi", "indian")},
+    "krishna": {"gender": "male", "traits": ("warm", "calm", "gentle", "hindi", "indian", "devotional")},
+    "chanakya": {"gender": "male", "traits": ("mature", "authoritative", "deep", "wise")},
+    "laxmibai": {"gender": "female", "traits": ("confident", "strong", "warm", "reassuring")},
 }
 
 _voice_cache: list[dict] = []
@@ -39,10 +32,10 @@ def _request_elevenlabs_voices(api_key: str) -> list[dict]:
             voices = json.loads(response.read().decode("utf-8")).get("voices", [])
     except urllib.error.HTTPError as error:
         log.error("ElevenLabs voice discovery failed with HTTP %s", error.code)
-        raise RuntimeError("ElevenLabs voice discovery failed") from None
+        raise RuntimeError(f"ElevenLabs voice discovery failed with HTTP {error.code}") from None
     except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as error:
         log.error("ElevenLabs voice discovery failed: %s", error)
-        raise RuntimeError("ElevenLabs voice discovery failed") from None
+        raise RuntimeError(f"ElevenLabs voice discovery failed: {error}") from None
 
     return [voice for voice in voices if voice.get("voice_id")]
 
@@ -107,36 +100,31 @@ def _request_elevenlabs_speech(api_key: str, voice_id: str, text: str) -> bytes:
         with urllib.request.urlopen(request, timeout=30) as response:
             return response.read()
     except urllib.error.HTTPError as error:
-        log.error("ElevenLabs speech generation failed with HTTP %s", error.code)
-        raise RuntimeError("ElevenLabs speech generation failed") from None
+        body = ""
+        try:
+            body = error.read().decode("utf-8")
+        except Exception:
+            pass
+        log.error("ElevenLabs speech generation failed with HTTP %s: %s", error.code, body)
+        raise RuntimeError(f"ElevenLabs speech generation failed with HTTP {error.code}: {body}") from None
     except (urllib.error.URLError, TimeoutError) as error:
         log.error("ElevenLabs speech generation failed: %s", error)
-        raise RuntimeError("ElevenLabs speech generation failed") from None
+        raise RuntimeError(f"ElevenLabs speech generation failed: {error}") from None
 
 
 async def generate_speech_bytes(text: str, persona: str) -> bytes:
-    """Generate speech with ElevenLabs when configured, otherwise fallback to Edge-TTS."""
+    """Generate speech strictly with ElevenLabs. No fallback."""
     api_key = os.getenv("ELEVENLABS_API_KEY")
-    if api_key:
-        try:
-            voice_id = _configured_voice_id(persona)
-            if not voice_id:
-                voices = await _get_elevenlabs_voices(api_key)
-                voice_id = _choose_elevenlabs_voice(voices, persona)
-                log.info("Selected ElevenLabs voice %s for persona %s", voice_id, persona)
-            audio = await asyncio.to_thread(_request_elevenlabs_speech, api_key, voice_id, text)
-            if audio:
-                return audio
-        except Exception as e:
-            log.warning("ElevenLabs generation notice: %s. Falling back to Edge-TTS...", e)
+    if not api_key:
+        raise RuntimeError("ELEVENLABS_API_KEY is missing. ElevenLabs is required for speech synthesis (fallback disabled).")
 
-    voice = VOICE_MAP.get(persona, VOICE_MAP["default"])
-    communicate = edge_tts.Communicate(text, voice, rate="-6%", pitch="-3Hz")
+    voice_id = _configured_voice_id(persona)
+    if not voice_id:
+        voices = await _get_elevenlabs_voices(api_key)
+        voice_id = _choose_elevenlabs_voice(voices, persona)
+        log.info("Selected ElevenLabs voice %s for persona %s", voice_id, persona)
 
-    audio_data = bytearray()
-
-    async for chunk in communicate.stream():
-        if chunk["type"] == "audio":
-            audio_data.extend(chunk["data"])
-
-    return bytes(audio_data)
+    audio = await asyncio.to_thread(_request_elevenlabs_speech, api_key, voice_id, text)
+    if not audio:
+        raise RuntimeError("ElevenLabs returned empty audio")
+    return audio
