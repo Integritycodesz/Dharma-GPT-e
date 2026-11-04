@@ -358,13 +358,13 @@ async def tts_endpoint(
     persona: str = Query("krishna", description="Persona (krishna, chanakya, laxmibai)")
 ):
     """
-    Returns authentic, human-quality neural speech MP3 generated via Edge-TTS.
-    Uses 'hi-IN-MadhurNeural' for male sages and 'hi-IN-SwaraNeural' for female sages.
+    Returns neural speech MP3 generated via ElevenLabs when configured, otherwise Edge-TTS.
     """
     try:
         audio = await generate_speech_bytes(text[:1200], persona)
         if audio:
             return Response(content=audio, media_type="audio/mpeg")
     except Exception as e:
-        logger.error(f"TTS endpoint error: {e}")
+        logger.error("TTS endpoint error: %s", e)
+        raise HTTPException(status_code=500, detail="Speech synthesis failed") from e
     raise HTTPException(status_code=500, detail="Speech synthesis failed")
